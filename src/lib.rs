@@ -1,5 +1,5 @@
 //!
-//! Axum Test is a library for writing tests for web servers written using Axum.
+//! Kantan is a library for writing responses to servers.
 //!
 //!  * You can spin up a `Server` within a test.
 //!  * Create requests that will run against that.
@@ -150,16 +150,11 @@
 mod server;
 pub use self::server::*;
 
-mod server_config;
-pub use self::server_config::*;
-
 mod request;
 pub use self::request::*;
 
 mod response;
 pub use self::response::*;
-
-pub mod util;
 
 pub use ::hyper::http;
 

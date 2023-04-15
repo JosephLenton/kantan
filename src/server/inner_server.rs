@@ -1,24 +1,20 @@
 use ::anyhow::anyhow;
 use ::anyhow::Context;
 use ::anyhow::Result;
-use ::axum::routing::IntoMakeService;
-use ::axum::Router;
-use ::axum::Server;
 use ::cookie::Cookie;
 use ::cookie::CookieJar;
 use ::hyper::http::HeaderValue;
 use ::hyper::http::Method;
+use ::hyper::http::Uri;
 use ::std::net::TcpListener;
 use ::std::sync::Arc;
 use ::std::sync::Mutex;
 use ::tokio::spawn;
 use ::tokio::task::JoinHandle;
 
-use crate::util::new_random_socket_addr;
 use crate::Request;
 use crate::RequestConfig;
 use crate::RequestDetails;
-use crate::ServerConfig;
 
 /// The `InnerServer` is the real server that runs.
 #[derive(Debug)]
@@ -32,7 +28,11 @@ pub(crate) struct InnerServer {
 
 impl InnerServer {
     /// Creates a `Server` running your app on the address given.
-    pub(crate) fn new(app: IntoMakeService<Router>, config: ServerConfig) -> Result<Self> {
+    pub(crate) fn new(url: Uri) -> Result<Self>
+    where
+        Uri: TryFrom<T>,
+        <Uri as TryFrom<T>>::Error: Into<Error>,
+    {
         let socket_address = match config.socket_address {
             Some(socket_address) => socket_address,
             None => new_random_socket_addr().context("Cannot create socket address for use")?,

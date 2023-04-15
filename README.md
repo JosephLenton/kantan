@@ -8,8 +8,11 @@
   [![docs](https://docs.rs/kantan/badge.svg)](https://docs.rs/kantan)
 </div>
 
-Kantan is a simple way to make requests to a server.
-With serde, ways to parse headers and cookies, and more, all built in.
+Kantan is for making requests to servers. Lots of libraries exist for that.
+Why use this?
+
+ * Comes with batteries included.
+ * Can automatically save cookies from responses -- useful for logging in, and then making a followup request.
 
 ## Features
 
@@ -44,24 +47,3 @@ This is primarily for testing Axum services.
       assert_eq!(response.contents, "pong!");
   }
 ```
-
-### Runs on a random port, allowing multiple to run at once
-
-When you start the server, you can spin it up on a random port.
-Allowing you to run multiple servers in parallel.
-
-This is to allow multiple E2E tests to run in parallel.
-Each with their own webserver.
-
-### Remembers cookies across requests
-
-It is common in E2E tests that step 1 is to login, and step 2 is the main request.
-To make this easier cookies returned from the server will be preserved,
-and then included into the next request. Like a web browser.
-
-### Fails fast on unexpected requests
-
-By default; all requests will panic if the server fails to return a 200.
-This can be switched to panic when the server _doesn't_ return a 200.
-
-This is a very opinionated design choice, and is done to help test writers fail fast when writing tests.

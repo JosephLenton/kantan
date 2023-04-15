@@ -1,7 +1,5 @@
 use ::anyhow::Context;
 use ::anyhow::Result;
-use ::axum::routing::IntoMakeService;
-use ::axum::Router;
 use ::cookie::Cookie;
 use ::cookie::CookieJar;
 use ::hyper::http::Method;
@@ -9,7 +7,6 @@ use ::std::sync::Arc;
 use ::std::sync::Mutex;
 
 use crate::Request;
-use crate::ServerConfig;
 
 mod inner_server;
 pub(crate) use self::inner_server::*;
@@ -36,18 +33,6 @@ impl Server {
     /// This is the same as creating a new `Server` with a configuration,
     /// and passing `ServerConfig::default()`.
     pub fn new(app: IntoMakeService<Router>) -> Result<Self> {
-        Self::new_with_config(app, ServerConfig::default())
-    }
-
-    /// This very similar to `Server::new()`,
-    /// however you can customise some of the configuration.
-    /// This includes which port to run on, or default settings.
-    ///
-    /// See the `ServerConfig` for more information on each configuration setting.
-    pub fn new_with_config(
-        app: IntoMakeService<Router>,
-        options: ServerConfig,
-    ) -> Result<Self> {
         let inner_test_server = InnerServer::new(app, options)?;
         let inner_mutex = Mutex::new(inner_test_server);
         let inner = Arc::new(inner_mutex);

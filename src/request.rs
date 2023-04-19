@@ -109,7 +109,7 @@ impl Request {
             body: None,
             headers: vec![],
             cookies,
-            content_type: config.content_type,
+            content_type: None,
             is_saving_cookies: config.save_cookies,
         })
     }

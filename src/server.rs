@@ -3,6 +3,8 @@ use ::anyhow::Result;
 use ::cookie::Cookie;
 use ::cookie::CookieJar;
 use ::hyper::http::Method;
+use ::hyper::http::Uri;
+use ::hyper::http::Error as HttpError;
 use ::std::sync::Arc;
 use ::std::sync::Mutex;
 
@@ -32,8 +34,12 @@ impl Server {
     ///
     /// This is the same as creating a new `Server` with a configuration,
     /// and passing `ServerConfig::default()`.
-    pub fn new(app: IntoMakeService<Router>) -> Result<Self> {
-        let inner_test_server = InnerServer::new(app, options)?;
+    pub fn new<U>(uri: U) -> Result<Self>
+    where
+        Uri: TryFrom<U>,
+        <Uri as TryFrom<U>>::Error: Into<HttpError>,
+    {
+        let inner_test_server = InnerServer::new(uri)?;
         let inner_mutex = Mutex::new(inner_test_server);
         let inner = Arc::new(inner_mutex);
 

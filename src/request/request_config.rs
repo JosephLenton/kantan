@@ -1,5 +1,9 @@
+use ::hyper::http::Method;
+
 #[derive(Debug, Clone)]
-pub struct RequestConfig {
+pub(crate) struct RequestConfig {
+
+    pub method: Method,
+    pub path: String,
     pub save_cookies: bool,
-    pub content_type: Option<String>,
 }

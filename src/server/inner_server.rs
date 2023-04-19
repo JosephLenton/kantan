@@ -6,11 +6,9 @@ use ::cookie::CookieJar;
 use ::hyper::http::HeaderValue;
 use ::hyper::http::Method;
 use ::hyper::http::Uri;
-use ::std::net::TcpListener;
+use ::hyper::http::Error as HttpError;
 use ::std::sync::Arc;
 use ::std::sync::Mutex;
-use ::tokio::spawn;
-use ::tokio::task::JoinHandle;
 
 use crate::Request;
 use crate::RequestConfig;
@@ -19,48 +17,29 @@ use crate::RequestDetails;
 /// The `InnerServer` is the real server that runs.
 #[derive(Debug)]
 pub(crate) struct InnerServer {
-    server_thread: JoinHandle<()>,
-    server_address: String,
+    server_address: Uri,
     cookies: CookieJar,
     save_cookies: bool,
-    default_content_type: Option<String>,
 }
 
 impl InnerServer {
     /// Creates a `Server` running your app on the address given.
-    pub(crate) fn new(url: Uri) -> Result<Self>
+    pub(crate) fn new<U>(uri: U) -> Result<Self>
     where
-        Uri: TryFrom<T>,
-        <Uri as TryFrom<T>>::Error: Into<Error>,
+        Uri: TryFrom<U>,
+        <Uri as TryFrom<U>>::Error: Into<HttpError>,
     {
-        let socket_address = match config.socket_address {
-            Some(socket_address) => socket_address,
-            None => new_random_socket_addr().context("Cannot create socket address for use")?,
-        };
-
-        let listener = TcpListener::bind(socket_address)
-            .with_context(|| "Failed to create TCPListener for Server")?;
-        let server_address = socket_address.to_string();
-        let server = Server::from_tcp(listener)
-            .with_context(|| "Failed to create ::axum::Server for Server")?
-            .serve(app);
-
-        let server_thread = spawn(async move {
-            server.await.expect("Expect server to start serving");
-        });
-
+        let server_address = uri.try_into().with_context(|| "Failed to parse server address URI")?;
         let test_server = Self {
-            server_thread,
-            server_address,
+            server_address: uri.try_into()?,
             cookies: CookieJar::new(),
-            save_cookies: config.save_cookies,
-            default_content_type: config.default_content_type,
+            save_cookies: false,
         };
 
         Ok(test_server)
     }
 
-    pub(crate) fn server_address<'a>(&'a self) -> &'a str {
+    pub(crate) fn server_address<'a>(&'a self) -> &'a Uri {
         &self.server_address
     }
 
@@ -119,22 +98,22 @@ impl InnerServer {
         })
     }
 
-    pub(crate) fn test_request_config(this: &Arc<Mutex<Self>>) -> Result<RequestConfig> {
-        InnerServer::with_this(this, "test_request_config", |this| RequestConfig {
+    pub(crate) fn request_config(this: &Arc<Mutex<Self>>) -> Result<RequestConfig> {
+        InnerServer::with_this(this, "request_config", |this| RequestConfig {
             save_cookies: this.save_cookies,
-            content_type: this.default_content_type.clone(),
         })
     }
 
     pub(crate) fn send(this: &Arc<Mutex<Self>>, method: Method, path: &str) -> Result<Request> {
-        let config = InnerServer::test_request_config(this)?;
+        let config = InnerServer::request_config(this)?;
 
         Request::new(
             this.clone(),
             config,
-            RequestDetails {
+            RequestConfig {
                 method,
                 path: path.to_string(),
+                save_cookies: InnerServer::coo
             },
         )
     }
@@ -175,11 +154,5 @@ impl InnerServer {
         let result = some_action(&mut this_locked);
 
         Ok(result)
-    }
-}
-
-impl Drop for InnerServer {
-    fn drop(&mut self) {
-        self.server_thread.abort();
     }
 }

@@ -13,6 +13,7 @@ use ::serde::Deserialize;
 use ::std::convert::AsRef;
 use ::std::fmt::Debug;
 use ::std::fmt::Display;
+use hyper::Uri;
 
 ///
 /// The `TestResponse` represents the result of a `Request`.
@@ -25,16 +26,16 @@ use ::std::fmt::Display;
 ///
 #[derive(Clone, Debug)]
 pub struct TestResponse {
-    request_url: String,
+    request_uri: Uri,
     headers: HeaderMap<HeaderValue>,
     status_code: StatusCode,
     response_body: Bytes,
 }
 
 impl TestResponse {
-    pub(crate) fn new(request_url: String, parts: Parts, response_body: Bytes) -> Self {
+    pub(crate) fn new(request_uri: Uri, parts: Parts, response_body: Bytes) -> Self {
         Self {
-            request_url,
+            request_uri,
             headers: parts.headers,
             status_code: parts.status,
             response_body,
@@ -43,8 +44,8 @@ impl TestResponse {
 
     /// The URL that was used to produce this response.
     #[must_use]
-    pub fn request_url<'a>(&'a self) -> &'a str {
-        &self.request_url
+    pub fn request_uri<'a>(&'a self) -> &'a Uri {
+        &self.request_uri
     }
 
     /// Returns the raw underlying response, as it's raw bytes.
@@ -101,7 +102,7 @@ impl TestResponse {
             .with_context(|| {
                 format!(
                     "Cannot find header {} for response {}",
-                    debug_header, self.request_url
+                    debug_header, self.request_uri
                 )
             })
             .unwrap()
@@ -140,7 +141,7 @@ impl TestResponse {
             .with_context(|| {
                 format!(
                     "Cannot find cookie {} for response {}",
-                    cookie_name, self.request_url
+                    cookie_name, self.request_uri
                 )
             })
             .unwrap()
@@ -170,7 +171,7 @@ impl TestResponse {
                 .with_context(|| {
                     format!(
                         "Reading header 'Set-Cookie' as string for response {}",
-                        self.request_url
+                        self.request_uri
                     )
                 })
                 .unwrap();
@@ -179,7 +180,7 @@ impl TestResponse {
                 .with_context(|| {
                     format!(
                         "Parsing 'Set-Cookie' header for response {}",
-                        self.request_url
+                        self.request_uri
                     )
                 })
                 .unwrap()
@@ -197,7 +198,7 @@ impl TestResponse {
             .with_context(|| {
                 format!(
                     "Deserializing response from JSON for request {}",
-                    self.request_url
+                    self.request_uri
                 )
             })
             .unwrap()

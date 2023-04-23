@@ -2,9 +2,10 @@ use ::anyhow::Context;
 use ::anyhow::Result;
 use ::cookie::Cookie;
 use ::cookie::CookieJar;
+use ::hyper::http::Error as HttpError;
 use ::hyper::http::Method;
 use ::hyper::http::Uri;
-use ::hyper::http::Error as HttpError;
+use ::std::error::Error as StdError;
 use ::std::sync::Arc;
 use ::std::sync::Mutex;
 
@@ -12,6 +13,7 @@ use crate::Request;
 
 mod inner_server;
 pub(crate) use self::inner_server::*;
+use hyper::server;
 
 ///
 /// The `Server` represents your application, running as a web server,
@@ -34,12 +36,8 @@ impl Server {
     ///
     /// This is the same as creating a new `Server` with a configuration,
     /// and passing `ServerConfig::default()`.
-    pub fn new<U>(uri: U) -> Result<Self>
-    where
-        Uri: TryFrom<U>,
-        <Uri as TryFrom<U>>::Error: Into<HttpError>,
-    {
-        let inner_test_server = InnerServer::new(uri)?;
+    pub fn new(server_address: String) -> Result<Self> {
+        let inner_test_server = InnerServer::new(server_address)?;
         let inner_mutex = Mutex::new(inner_test_server);
         let inner = Arc::new(inner_mutex);
 

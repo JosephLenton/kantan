@@ -6,41 +6,32 @@ use ::cookie::CookieJar;
 use ::hyper::http::HeaderValue;
 use ::hyper::http::Method;
 use ::hyper::http::Uri;
-use ::hyper::http::Error as HttpError;
 use ::std::sync::Arc;
 use ::std::sync::Mutex;
 
 use crate::Request;
 use crate::RequestConfig;
-use crate::RequestDetails;
 
 /// The `InnerServer` is the real server that runs.
 #[derive(Debug)]
 pub(crate) struct InnerServer {
-    server_address: Uri,
+    server_address: String,
     cookies: CookieJar,
     save_cookies: bool,
+    default_content_type: Option<String>,
 }
 
 impl InnerServer {
     /// Creates a `Server` running your app on the address given.
-    pub(crate) fn new<U>(uri: U) -> Result<Self>
-    where
-        Uri: TryFrom<U>,
-        <Uri as TryFrom<U>>::Error: Into<HttpError>,
-    {
-        let server_address = uri.try_into().with_context(|| "Failed to parse server address URI")?;
+    pub(crate) fn new(server_address: String) -> Result<Self> {
         let test_server = Self {
-            server_address: uri.try_into()?,
+            server_address,
             cookies: CookieJar::new(),
             save_cookies: false,
+            default_content_type: None,
         };
 
         Ok(test_server)
-    }
-
-    pub(crate) fn server_address<'a>(&'a self) -> &'a Uri {
-        &self.server_address
     }
 
     pub(crate) fn cookies<'a>(&'a self) -> &'a CookieJar {
@@ -98,37 +89,37 @@ impl InnerServer {
         })
     }
 
-    pub(crate) fn request_config(this: &Arc<Mutex<Self>>) -> Result<RequestConfig> {
-        InnerServer::with_this(this, "request_config", |this| RequestConfig {
-            save_cookies: this.save_cookies,
-        })
+    pub(crate) fn build_request_config(
+        this: &Arc<Mutex<Self>>,
+        method: Method,
+        path: &str,
+    ) -> Result<RequestConfig> {
+        InnerServer::with_this(this, "request_config", |this| {
+            let request_path = build_request_path(&this.server_address, path)?;
+            let config = RequestConfig {
+                method,
+                request_path,
+                save_cookies: this.save_cookies,
+                content_type: this.default_content_type.clone(),
+            };
+
+            Ok(config)
+        })?
     }
 
     pub(crate) fn send(this: &Arc<Mutex<Self>>, method: Method, path: &str) -> Result<Request> {
-        let config = InnerServer::request_config(this)?;
+        let config = InnerServer::build_request_config(this, method, path)?;
 
-        Request::new(
-            this.clone(),
-            config,
-            RequestConfig {
-                method,
-                path: path.to_string(),
-                save_cookies: InnerServer::coo
-            },
-        )
+        Request::new(this.clone(), config)
     }
 
     pub(crate) fn with_this<F, R>(this: &Arc<Mutex<Self>>, name: &str, some_action: F) -> Result<R>
     where
         F: FnOnce(&mut Self) -> R,
     {
-        let mut this_locked = this.lock().map_err(|err| {
-            anyhow!(
-                "Failed to lock InternalServer for `{}`, {:?}",
-                name,
-                err,
-            )
-        })?;
+        let mut this_locked = this
+            .lock()
+            .map_err(|err| anyhow!("Failed to lock InternalServer for `{}`, {:?}", name, err,))?;
 
         let result = some_action(&mut this_locked);
 
@@ -143,16 +134,26 @@ impl InnerServer {
     where
         F: FnOnce(&mut Self) -> R,
     {
-        let mut this_locked = this.lock().map_err(|err| {
-            anyhow!(
-                "Failed to lock InternalServer for `{}`, {:?}",
-                name,
-                err,
-            )
-        })?;
+        let mut this_locked = this
+            .lock()
+            .map_err(|err| anyhow!("Failed to lock InternalServer for `{}`, {:?}", name, err,))?;
 
         let result = some_action(&mut this_locked);
 
         Ok(result)
     }
+}
+
+fn build_request_path(root: &str, sub_path: &str) -> Result<Uri> {
+    if sub_path.is_empty() {
+        return Ok(root.try_into()?);
+    }
+
+    if sub_path.starts_with("/") {
+        let full_path = format!("{}{}", root, sub_path).try_into()?;
+        return Ok(full_path);
+    }
+
+    let full_path = format!("{}/{}", root, sub_path).try_into()?;
+    Ok(full_path)
 }

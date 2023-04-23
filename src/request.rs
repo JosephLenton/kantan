@@ -9,8 +9,8 @@ use ::hyper::body::Body;
 use ::hyper::body::Bytes;
 use ::hyper::header;
 use ::hyper::header::HeaderName;
-use ::hyper::http::HeaderValue;
 use ::hyper::http::header::SET_COOKIE;
+use ::hyper::http::HeaderValue;
 use ::hyper::http::Request as HyperRequest;
 use ::hyper::Client;
 use ::serde::Serialize;
@@ -27,9 +27,6 @@ use crate::TestResponse;
 
 mod request_config;
 pub(crate) use self::request_config::*;
-
-mod request_details;
-pub(crate) use self::request_details::*;
 
 const JSON_CONTENT_TYPE: &'static str = &"application/json";
 const TEXT_CONTENT_TYPE: &'static str = &"text/plain";
@@ -69,15 +66,13 @@ const TEXT_CONTENT_TYPE: &'static str = &"text/plain";
 #[derive(Debug)]
 #[must_use = "futures do nothing unless polled"]
 pub struct Request {
-    details: RequestDetails,
+    config: RequestConfig,
 
     inner_test_server: Arc<Mutex<InnerServer>>,
 
-    full_request_path: String,
     body: Option<Body>,
     headers: Vec<(HeaderName, HeaderValue)>,
     cookies: CookieJar,
-    content_type: Option<String>,
 
     is_saving_cookies: bool,
 }
@@ -86,31 +81,28 @@ impl Request {
     pub(crate) fn new(
         inner_test_server: Arc<Mutex<InnerServer>>,
         config: RequestConfig,
-        details: RequestDetails,
     ) -> Result<Self> {
+        let is_saving_cookies = config.save_cookies;
         let server_locked = inner_test_server.as_ref().lock().map_err(|err| {
             anyhow!(
                 "Failed to lock InternalServer for {} {}, received {:?}",
-                details.method,
-                details.path,
+                config.method,
+                config.request_path,
                 err
             )
         })?;
-        let full_request_path = build_request_path(server_locked.server_address(), &details.path);
 
         let cookies = server_locked.cookies().clone();
 
         ::std::mem::drop(server_locked);
 
         Ok(Self {
-            details,
+            config,
             inner_test_server,
-            full_request_path,
             body: None,
             headers: vec![],
             cookies,
-            content_type: None,
-            is_saving_cookies: config.save_cookies,
+            is_saving_cookies,
         })
     }
 
@@ -152,8 +144,8 @@ impl Request {
         let body: Body = body_bytes.into();
         self.body = Some(body);
 
-        if self.content_type == None {
-            self.content_type = Some(JSON_CONTENT_TYPE.to_string());
+        if self.config.content_type == None {
+            self.config.content_type = Some(JSON_CONTENT_TYPE.to_string());
         }
 
         self
@@ -169,8 +161,8 @@ impl Request {
         let body_text = format!("{}", raw_text);
         let body_bytes = Bytes::from(body_text.into_bytes());
 
-        if self.content_type == None {
-            self.content_type = Some(TEXT_CONTENT_TYPE.to_string());
+        if self.config.content_type == None {
+            self.config.content_type = Some(TEXT_CONTENT_TYPE.to_string());
         }
 
         self.bytes(body_bytes)
@@ -188,7 +180,7 @@ impl Request {
 
     /// Set the content type to use for this request in the header.
     pub fn content_type(mut self, content_type: &str) -> Self {
-        self.content_type = Some(content_type.to_string());
+        self.config.content_type = Some(content_type.to_string());
         self
     }
 
@@ -197,17 +189,17 @@ impl Request {
     }
 
     async fn send(mut self) -> Result<TestResponse> {
-        let path = self.details.path;
+        let request_path = self.config.request_path;
+        let method = self.config.method;
+        let content_type = self.config.content_type;
         let save_cookies = self.is_saving_cookies;
         let body = self.body.unwrap_or(Body::empty());
 
-        let mut request_builder = HyperRequest::builder()
-            .uri(&self.full_request_path)
-            .method(self.details.method);
+        let mut request_builder = HyperRequest::builder().uri(&request_path).method(method);
 
         // Add all the headers we have.
         let mut headers = self.headers;
-        if let Some(content_type) = self.content_type {
+        if let Some(content_type) = content_type {
             let header = build_content_type_header(content_type)?;
             headers.push(header);
         }
@@ -227,14 +219,16 @@ impl Request {
         let request = request_builder.body(body).with_context(|| {
             format!(
                 "Expect valid hyper Request to be built on request to {}",
-                path
+                request_path
             )
         })?;
 
-        let hyper_response = Client::new()
-            .request(request)
-            .await
-            .with_context(|| format!("Expect Hyper Response to succeed on request to {}", path))?;
+        let hyper_response = Client::new().request(request).await.with_context(|| {
+            format!(
+                "Expect Hyper Response to succeed on request to {}",
+                request_path
+            )
+        })?;
 
         let (parts, response_body) = hyper_response.into_parts();
         let response_bytes = to_bytes(response_body).await?;
@@ -244,7 +238,7 @@ impl Request {
             InnerServer::add_cookies_by_header(&mut self.inner_test_server, cookie_headers)?;
         }
 
-        let mut response = TestResponse::new(path, parts, response_bytes);
+        let response = TestResponse::new(request_path, parts, response_bytes);
         Ok(response)
     }
 }
@@ -257,18 +251,6 @@ impl IntoFuture for Request {
         let raw_future = self.send_or_panic();
         AutoFuture::new(raw_future)
     }
-}
-
-fn build_request_path(root_path: &str, sub_path: &str) -> String {
-    if sub_path == "" {
-        return format!("http://{}", root_path.to_string());
-    }
-
-    if sub_path.starts_with("/") {
-        return format!("http://{}{}", root_path, sub_path);
-    }
-
-    format!("http://{}/{}", root_path, sub_path)
 }
 
 fn build_content_type_header(content_type: String) -> Result<(HeaderName, HeaderValue)> {

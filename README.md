@@ -11,39 +11,8 @@
 Kantan is for making requests to servers. Lots of libraries exist for that.
 Why use this?
 
- * Comes with batteries included.
- * Can automatically save cookies from responses -- useful for logging in, and then making a followup request.
+ * Comes with batteries included. No need to setup Hyper + Serde + Bytes + etc (again).
+ * Can automatically save cookies and such from responses -- useful for logging in, and then making a followup request.
+ * Can be setup to use headers, query urls, cookies, across multiple requests ahead of time.
 
-## Features
-
-This is for spinning up an Axum service, that you can then query directly.
-This is primarily for testing Axum services.
-
-```rust
-  use ::axum::Router;
-  use ::axum::routing::get;
-
-  use ::axum_test_server::Server;
-
-  async fn get_ping() -> &'static str {
-      "pong!"
-  }
-
-  #[tokio::test]
-  async fn it_sound_get() {
-      // Build an application with a route.
-      let app = Router::new()
-          .route("/ping", get(get_ping))
-          .into_make_service();
-
-      // Run the server on a random address.
-      let server = Server::new(app).unwrap();
-
-      // Get the request.
-      let response = server
-          .get("/ping")
-          .await;
-
-      assert_eq!(response.contents, "pong!");
-  }
-```
+**This is still an early work in progress.**

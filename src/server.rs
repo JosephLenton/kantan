@@ -2,10 +2,7 @@ use ::anyhow::Context;
 use ::anyhow::Result;
 use ::cookie::Cookie;
 use ::cookie::CookieJar;
-use ::hyper::http::Error as HttpError;
 use ::hyper::http::Method;
-use ::hyper::http::Uri;
-use ::std::error::Error as StdError;
 use ::std::sync::Arc;
 use ::std::sync::Mutex;
 
@@ -13,7 +10,6 @@ use crate::Request;
 
 mod inner_server;
 pub(crate) use self::inner_server::*;
-use hyper::server;
 
 ///
 /// The `Server` represents your application, running as a web server,

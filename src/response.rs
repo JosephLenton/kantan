@@ -16,7 +16,7 @@ use ::std::fmt::Display;
 use hyper::Uri;
 
 ///
-/// The `TestResponse` represents the result of a `Request`.
+/// The `Response` represents the result of a `Request`.
 /// It is returned when you call await on a `Request` object.
 ///
 /// Inside are the contents of the response, the status code, and some
@@ -25,14 +25,14 @@ use hyper::Uri;
 /// and validating the response looks how you expect.
 ///
 #[derive(Clone, Debug)]
-pub struct TestResponse {
+pub struct Response {
     request_uri: Uri,
     headers: HeaderMap<HeaderValue>,
     status_code: StatusCode,
     response_body: Bytes,
 }
 
-impl TestResponse {
+impl Response {
     pub(crate) fn new(request_uri: Uri, parts: Parts, response_body: Bytes) -> Self {
         Self {
             request_uri,

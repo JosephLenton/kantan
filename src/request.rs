@@ -23,7 +23,7 @@ use ::std::sync::Arc;
 use ::std::sync::Mutex;
 
 use crate::InnerServer;
-use crate::TestResponse;
+use crate::Response;
 
 mod request_config;
 pub(crate) use self::request_config::*;
@@ -61,7 +61,7 @@ const TEXT_CONTENT_TYPE: &'static str = &"text/plain";
 /// let response = request.await;
 /// ```
 ///
-/// You will receive back a `TestResponse`.
+/// You will receive back a `Response`.
 ///
 #[derive(Debug)]
 #[must_use = "futures do nothing unless polled"]
@@ -184,11 +184,11 @@ impl Request {
         self
     }
 
-    async fn send_or_panic(self) -> TestResponse {
+    async fn send_or_panic(self) -> Response {
         self.send().await.expect("Sending request failed")
     }
 
-    async fn send(mut self) -> Result<TestResponse> {
+    async fn send(mut self) -> Result<Response> {
         let request_path = self.config.request_path;
         let method = self.config.method;
         let content_type = self.config.content_type;
@@ -238,14 +238,16 @@ impl Request {
             InnerServer::add_cookies_by_header(&mut self.inner_test_server, cookie_headers)?;
         }
 
-        let response = TestResponse::new(request_path, parts, response_bytes);
+        let response = Response::new(request_path, parts, response_bytes);
         Ok(response)
     }
 }
 
+unsafe impl Send for Request {}
+
 impl IntoFuture for Request {
-    type Output = TestResponse;
-    type IntoFuture = AutoFuture<TestResponse>;
+    type Output = Response;
+    type IntoFuture = AutoFuture<Response>;
 
     fn into_future(self) -> Self::IntoFuture {
         let raw_future = self.send_or_panic();

@@ -21,7 +21,7 @@ use ::std::pin::Pin;
 use ::std::task::Context as TaskContext;
 use ::std::task::Poll;
 
-use crate::TestResponse;
+use crate::Response;
 
 /// This contains the response from the server.
 ///
@@ -118,7 +118,7 @@ impl RequestFuture {
 }
 
 impl Future for RequestFuture {
-    type Output = TestResponse;
+    type Output = Response;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut TaskContext<'_>) -> Poll<Self::Output> {
         loop {
@@ -194,7 +194,7 @@ impl Future for RequestFuture {
                                 .unwrap();
 
                             let mut test_response =
-                                TestResponse::new(debug_path.clone(), response_bytes, parts.status);
+                                Response::new(debug_path.clone(), response_bytes, parts.status);
 
                             self.state = Some(RequestState::Complete);
 

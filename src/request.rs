@@ -13,6 +13,7 @@ use ::hyper::http::header::SET_COOKIE;
 use ::hyper::http::HeaderValue;
 use ::hyper::http::Request as HyperRequest;
 use ::hyper::Client;
+use ::hyper_tls::HttpsConnector;
 use ::serde::Serialize;
 use ::serde_json::to_vec as json_to_vec;
 use ::std::convert::AsRef;
@@ -223,7 +224,10 @@ impl Request {
             )
         })?;
 
-        let hyper_response = Client::new().request(request).await.with_context(|| {
+        let https = HttpsConnector::new();
+        let client = Client::builder().build::<_, hyper::Body>(https);
+
+        let hyper_response = client.request(request).await.with_context(|| {
             format!(
                 "Expect Hyper Response to succeed on request to {}",
                 request_path
